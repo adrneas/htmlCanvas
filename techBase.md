@@ -22,7 +22,55 @@ Este arquivo **não** deve ser tratado como documentação oficial da especifica
 
 ---
 
-## 1. Resumo executivo
+
+## 1. Contratos TypeScript de Interface
+
+Use estes contratos como âncora de geração. Eles são parciais e representam a superfície mínima esperada para POCs. Não inventar métodos fora destes contratos sem validação explícita em fonte oficial ou adapter isolado.
+
+```ts
+declare interface HTMLCanvasElement extends HTMLElement {
+  layoutsubtree?: boolean;
+  onpaint: ((this: HTMLCanvasElement, ev: Event) => any) | null;
+  requestPaint?: () => void;
+  captureElementImage?: (element: Element) => ImageBitmap | CanvasImageSource;
+}
+
+declare interface CanvasRenderingContext2D {
+  drawElementImage(element: Element, x: number, y: number): DOMMatrix;
+}
+
+type HtmlInCanvasSupport = {
+  canvas: boolean;
+  context2d: boolean;
+  drawElementImage: boolean;
+  paintEvent: boolean;
+  requestPaint: boolean;
+};
+
+type HtmlInCanvasMode = "native" | "fallback";
+
+type HtmlInCanvasRenderTarget = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  element: Element;
+  x: number;
+  y: number;
+};
+
+type HtmlInCanvasCleanup = () => void;
+```
+
+Agentes devem usar estes contratos para:
+
+- guiar feature detection;
+- evitar helpers inventados, como `transform.toCSS()`;
+- separar modo nativo e fallback;
+- garantir cleanup explícito;
+- isolar APIs WebGL/WebGPU/engine-specific em adapters tipados.
+
+---
+
+## 2. Resumo executivo
 
 HTML-in-Canvas é uma proposta experimental que permite renderizar elementos reais do DOM dentro de um `<canvas>`, mantendo capacidades nativas do navegador que seriam perdidas em uma renderização puramente pixel-based.
 
@@ -48,7 +96,7 @@ A lógica central é:
 
 ---
 
-## 2. Status tecnológico
+## 3. Status tecnológico
 
 ### 2.1 Maturidade
 
@@ -83,7 +131,7 @@ Evite depender exclusivamente da API em:
 
 ---
 
-## 3. Vocabulário e nomes corretos
+## 4. Vocabulário e nomes corretos
 
 ### 3.1 Nomes corretos
 
@@ -155,7 +203,7 @@ Só usar se estiverem confirmados no ambiente ou documentados na versão alvo. A
 
 ---
 
-## 4. Modelo mental da API
+## 5. Modelo mental da API
 
 ### 4.1 Estrutura
 
@@ -202,7 +250,7 @@ Sem isso, o usuário pode ver o botão em um lugar e o navegador entender que el
 
 ---
 
-## 5. Contrato estrutural obrigatório
+## 6. Contrato estrutural obrigatório
 
 Qualquer implementação gerada por agente deve respeitar este contrato.
 
@@ -292,7 +340,7 @@ Observação: `ctx.reset()` ainda pode não estar disponível em todos os ambien
 
 ---
 
-## 6. Feature detection e fallback
+## 7. Feature detection e fallback
 
 ### 6.1 Regra obrigatória
 
@@ -375,7 +423,7 @@ Esta visualização experimental requer navegador Chromium com HTML-in-Canvas ha
 
 ---
 
-## 7. Resize, escala e anti-blur
+## 8. Resize, escala e anti-blur
 
 ### 7.1 Problema
 
@@ -413,7 +461,7 @@ observer.observe(canvas, { box: "device-pixel-content-box" });
 
 ---
 
-## 8. Ciclo de paint
+## 9. Ciclo de paint
 
 ### 8.1 Regra
 
@@ -445,7 +493,7 @@ Mudanças de DOM feitas dentro do handler de `paint` podem só aparecer no frame
 
 ---
 
-## 9. Segurança e privacidade
+## 10. Segurança e privacidade
 
 A API possui restrições para evitar vazamento de dados sensíveis via leitura de pixels, timing ou invalidação.
 
@@ -467,7 +515,7 @@ Regra prática:
 
 ---
 
-## 10. Acessibilidade
+## 11. Acessibilidade
 
 HTML-in-Canvas não elimina a responsabilidade de acessibilidade.
 
@@ -485,7 +533,7 @@ Checklist mínimo:
 
 ---
 
-## 11. Gerenciamento de elementos e memória
+## 12. Gerenciamento de elementos e memória
 
 ### 11.1 Remoção correta
 
@@ -512,7 +560,7 @@ Para muitas UIs dinâmicas:
 
 ---
 
-## 12. Integração 2D
+## 13. Integração 2D
 
 ### 12.1 Caso recomendado
 
@@ -585,7 +633,7 @@ export function mountHtmlInCanvas2D({ canvas, uiRoot, draw }) {
 
 ---
 
-## 13. Integração WebGL/WebGPU
+## 14. Integração WebGL/WebGPU
 
 ### 13.1 WebGL
 
@@ -641,7 +689,7 @@ Quando gerar código WebGL/WebGPU:
 
 ---
 
-## 14. Integração com frameworks
+## 15. Integração com frameworks
 
 ### 14.1 React
 
@@ -653,13 +701,22 @@ Padrão recomendado:
 - limpar listeners/observers no cleanup;
 - manter fallback como branch separado.
 
+Restrição obrigatória para agentes:
+
+- isolar o ciclo de pintura do canvas (`paint`, `drawElementImage`, `requestPaint`) do estado declarativo do framework (`useState`, stores reativas, signals);
+- não acionar `requestPaint` diretamente a partir de mudanças de estado que também são causadas pelo próprio ciclo de pintura;
+- manter dados mutáveis de renderização em `useRef` ou módulo isolado, não em `useState`;
+- evitar loops `state -> render React -> requestPaint -> paint -> setState -> render React`;
+- usar estado React apenas para modo de suporte, fallback, dados de UI e controles do usuário;
+- se for necessário reagir a mudanças de layout/conteúdo, usar throttling/debouncing ou fila explícita de renderização.
+
 Exemplo conceitual:
 
 ```jsx
 function HtmlCanvasDemo() {
   const canvasRef = useRef(null);
   const uiRef = useRef(null);
-  const [supported, setSupported] = useState(true);
+  const [mode, setMode] = useState("native");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -670,7 +727,7 @@ function HtmlCanvasDemo() {
     const ctx = canvas.getContext("2d");
 
     if (!ctx || !("drawElementImage" in CanvasRenderingContext2D.prototype)) {
-      setSupported(false);
+      setMode("fallback");
       return;
     }
 
@@ -689,7 +746,7 @@ function HtmlCanvasDemo() {
     };
   }, []);
 
-  if (!supported) {
+  if (mode === "fallback") {
     return <FallbackDomUI />;
   }
 
@@ -727,7 +784,7 @@ Mesma regra:
 
 ---
 
-## 15. Padrão de arquitetura para projeto com agentes
+## 16. Padrão de arquitetura para projeto com agentes
 
 ### 15.1 Organização sugerida
 
@@ -780,7 +837,24 @@ src/
 
 ---
 
-## 16. Critérios de aceite para agentes
+## 17. Critérios de aceite
+
+### Contrato de penalização para agentes
+
+Falhas que invalidam a entrega:
+
+| Falha | Severidade | Ação esperada |
+|---|---:|---|
+| `layout subtree` em vez de `layoutsubtree` | crítica | rejeitar/patch imediato |
+| chamada a `drawElementImage` sem feature detection | crítica | adicionar guarda e fallback |
+| fallback ausente ou apenas visual | crítica | implementar fallback DOM funcional |
+| API inventada sem adapter | crítica | remover ou isolar atrás de adapter tipado |
+| falta de sincronização `DOMMatrix -> CSS transform` | crítica | aplicar transform e `transform-origin` |
+| ausência de cleanup | alta | retornar função de cleanup |
+| `devicePixelRatio` ignorado | alta | adicionar `ResizeObserver` e escala correta |
+| duplicação de elementos focáveis no fallback | alta | garantir um único modo interativo ativo |
+| loop React causado por `paint -> setState -> requestPaint` | alta | mover estado de renderização para refs/adapters |
+ para agentes
 
 Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 
@@ -832,7 +906,7 @@ Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 
 ---
 
-## 17. Anti-padrões
+## 18. Anti-padrões
 
 Evitar:
 
@@ -884,84 +958,84 @@ Motivo: custo alto de layout, acessibilidade e garbage collection.
 
 ---
 
-## 18. Prompt base para Codex/agente
+## 19. Implementation prompt for Codex/agent
 
-Use este prompt quando pedir implementação:
+Use this prompt when requesting implementation:
 
 ```txt
-Você está implementando uma POC com HTML-in-Canvas.
+You are developing a POC using the experimental HTML-in-Canvas API. 
+Adhere strictly to the technical constraints outlined in this document.
 
-Use a base tecnológica deste projeto como fonte de verdade. A API é experimental; portanto:
+Constraints:
+1. Use the `layoutsubtree` attribute (no spaces).
+2. Perform explicit feature detection before invoking `drawElementImage`.
+3. Render actual HTML within the `<canvas>` tags.
+4. Use the `paint` event listener to draw elements.
+5. Apply the `DOMMatrix` transform returned by `drawElementImage` to the DOM element to synchronize hit testing, focus, and accessibility.
+6. Implement `ResizeObserver` handling `devicePixelRatio` to prevent blurring.
+7. Provide a functional DOM overlay fallback. Do not invent non-documented WebGL/WebGPU/Three.js APIs; if using experimental integrations, isolate them in adapters.
+8. Include cleanup for all observers and listeners.
+9. Output manual testing criteria covering clicks, focus, resizing, accessibility, and fallback behavior.
 
-1. Use o atributo correto `layoutsubtree`.
-2. Faça feature detection antes de chamar `drawElementImage`.
-3. Renderize HTML real dentro do `<canvas>`.
-4. Use o evento `paint` para desenhar o elemento no canvas.
-5. Aplique o transform retornado por `drawElementImage` no elemento DOM para alinhar hit testing/foco/acessibilidade.
-6. Implemente ResizeObserver e ajuste para devicePixelRatio.
-7. Inclua fallback DOM overlay funcional.
-8. Não invente APIs. Se uma assinatura WebGL/WebGPU/Three.js não estiver confirmada, isole em adapter e documente como experimental.
-9. Inclua cleanup de listeners/observers.
-10. Entregue critérios de teste manual para clique, foco, resize, acessibilidade e fallback.
-
-Gere código simples, isolado e verificável.
+Output verified, isolated, and highly cohesive code.
 ```
 
 ---
 
-## 19. Prompt de revisão para agente
+## 20. Review prompt for agent
 
-Use este prompt para pedir auditoria:
+Use this prompt when requesting architectural review:
 
 ```txt
-Revise esta implementação de HTML-in-Canvas.
+Conduct a strict architectural and security review of the provided HTML-in-Canvas implementation. 
 
-Procure especificamente:
+Flag the following critical failures:
+- Incorrect attribute usage (e.g., `layout subtree` instead of `layoutsubtree`).
+- Missing feature detection before API calls.
+- Lack of a functional DOM overlay fallback.
+- Usage of fabricated or unverified APIs (e.g., `transform.toCSS()`).
+- Missing CSS transform synchronization.
+- Blurry canvas rendering due to unhandled `devicePixelRatio`.
+- Invisible ghost elements intercepting pointer events.
+- Memory leaks (missing listener/observer cleanups).
+- Broken accessibility structures or duplicate focusable elements in fallbacks.
 
-- uso incorreto de `layoutsubtree`;
-- ausência de feature detection;
-- ausência de fallback;
-- chamadas a APIs inexistentes ou não confirmadas;
-- falta de sincronização do transform;
-- canvas borrado por erro de devicePixelRatio;
-- elementos invisíveis interceptando eventos;
-- listeners/observers sem cleanup;
-- acessibilidade quebrada;
-- duplicação de UI interativa entre fallback e canvas;
-- código que depende de Chrome Canary/Origin Trial sem aviso.
-
-Retorne:
-1. problemas críticos;
-2. problemas médios;
-3. melhorias;
-4. patch sugerido.
+Output format:
+1. Critical Issues
+2. Moderate Issues
+3. Suggested Optimizations
+4. Refactored Code Patch
 ```
 
 ---
 
-## 20. Prompt de teste manual
+## 21. Manual testing prompt
+
+Use this prompt when requesting manual test coverage:
 
 ```txt
-Crie um checklist de teste manual para esta POC HTML-in-Canvas cobrindo:
+Create a manual testing checklist for this HTML-in-Canvas POC covering:
 
-- navegador com suporte;
-- navegador sem suporte;
-- clique;
-- foco por teclado;
-- digitação em input;
-- seleção de texto;
-- Ctrl/Cmd+F;
-- zoom do navegador;
-- resize da janela;
-- tela HiDPI;
-- leitor de tela;
-- remoção dinâmica de elementos;
-- fallback DOM overlay.
+- supported browser path;
+- unsupported browser path;
+- mouse/pointer click alignment;
+- keyboard focus order;
+- input typing;
+- text selection;
+- native Ctrl/Cmd+F page search;
+- browser zoom;
+- window resize;
+- HiDPI display behavior;
+- screen reader accessibility;
+- dynamic element removal;
+- DOM overlay fallback behavior;
+- absence of duplicate focusable elements between native and fallback modes;
+- cleanup after component unmount or route change.
 ```
 
 ---
 
-## 21. Exemplo de fallback completo simplificado
+## 22. Exemplo de fallback completo simplificado
 
 ```html
 <div class="stage-shell" data-mode="auto">
@@ -1012,7 +1086,7 @@ if (!supported) {
 
 ---
 
-## 22. Fontes técnicas para validação
+## 23. Fontes técnicas para validação
 
 Consultar antes de consolidar qualquer implementação de produção:
 
@@ -1028,19 +1102,3 @@ Consultar antes de consolidar qualquer implementação de produção:
 - Blink Dev — Intent/Developer Trial threads  
   https://groups.google.com/a/chromium.org/g/blink-dev
 
----
-
-## 23. Notas de correção em relação à documentação anterior
-
-Correções aplicadas nesta versão:
-
-- corrigido `layout subtree` para `layoutsubtree`;
-- removida confiança excessiva em `transform.toCSS()`;
-- reduzida a afirmação de suporte nativo estável em Three.js/PlayCanvas;
-- reforçado fallback obrigatório;
-- reforçado status experimental;
-- adicionados prompts de implementação, revisão e teste;
-- adicionados critérios de aceite;
-- adicionada arquitetura sugerida para agentes;
-- adicionados alertas de privacidade, acessibilidade e garbage collection;
-- separadas APIs confirmadas da proposta de helpers/integrações ainda experimentais.
