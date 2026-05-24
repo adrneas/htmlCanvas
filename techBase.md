@@ -1,122 +1,1046 @@
-# Contexto Tecnológico: HTML-in-Canvas API (Maio 2026)
+# Tech Base — HTML-in-Canvas para Desenvolvimento com IA Agêntica
 
-## 1. Visão Geral e Arquitetura
-A **HTML-in-Canvas API** é um padrão aberto (atualmente em Origin Trial no Google Chrome a partir de maio de 2026) que resolve a quebra de acessibilidade e interatividade ao renderizar interfaces dentro de contextos gráficos bidimensionais ou tridimensionais (`canvas`, `WebGL`, `WebGPU`). 
-
-Anteriormente, renderizar UI dentro de um canvas transformava o conteúdo em uma grade estática de pixels. Esta API atua como uma ponte bidirecional: ela permite pintar elementos do DOM diretamente no canvas/texturas mantendo o ciclo de vida do DOM ativo. O navegador continua processando testes de colisão (hit testing), acessibilidade, seleção de texto, tradução nativa e ferramentas de busca (`Ctrl+F`).
-
-### Requisitos Estruturais Básicos
-1. **Atributo `layout subtree`**: Deve ser declarado explicitamente na tag `<canvas>`. Ele instrui o motor do navegador a processar a subárvore do DOM aninhada para fins de renderização e acessibilidade.
-2. **HTML Aninhado**: Os elementos de interface (botões, inputs, forms, SVGs) devem ser declarados diretamente dentro das tags `<canvas></canvas>`.
-3. **Sincronização de Transformação CSS**: O desenvolvedor deve obrigatoriamente capturar a matriz de transformação gerada pelo método de renderização da API e aplicá-la de volta ao estilo CSS do elemento DOM correspondente. Isso garante que a camada invisível de interação do DOM coincida exatamente com os pixels desenhados no canvas.
+> Versão otimizada para uso como contexto técnico em Codex/agentes.  
+> Estado da tecnologia: experimental, em proposta WICG e Origin Trial/flags Chromium em maio de 2026. Não tratar como API estável.
 
 ---
 
-## 2. Fluxo de Implementação e Código Nativo
+## 0. Objetivo deste arquivo
 
-### 2.1 Renderização em Contexto 2D
-Para contextos `2d`, utiliza-se o método `drawElementImage` dentro do evento de repintura do elemento.
+Este documento deve servir como **fonte de verdade operacional** para agentes que irão desenvolver, revisar ou refatorar código usando **HTML-in-Canvas**.
 
-```javascript
-// 1. Configuração do Canvas e Captura do Elemento
-const canvas = document.querySelector('canvas');
-const ctx = canvas.getContext('2d');
-const uiElement = document.getElementById('my-ui-component');
+O agente deve usar este arquivo para:
 
-// 2. Loop de Renderização / Evento de Paint
-uiElement.addEventListener('paint', (event) => {
-  // Limpa o canvas antes de redesenhar
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+- entender a arquitetura correta da API;
+- evitar APIs inventadas, nomes incorretos ou padrões frágeis;
+- gerar código com fallback;
+- preservar acessibilidade e interatividade;
+- separar claramente protótipo experimental de código de produção;
+- validar o resultado com critérios objetivos.
 
-  // Desenha o elemento DOM nas coordenadas X, Y desejadas
-  const transform = ctx.drawElementImage(uiElement, 10, 10);
+Este arquivo **não** deve ser tratado como documentação oficial da especificação. Sempre que houver conflito com a documentação oficial/WICG/Chromium, a fonte oficial prevalece.
 
-  // CRÍTICO: Atualiza o transform do DOM para manter a interatividade alinhada
-  uiElement.style.transform = transform.toCSS(); 
-});
+---
 
-### 2.2 Renderização em Contexto WebGL (Texturas)
-Em ambientes 3D com WebGL, mapeia-se o elemento DOM diretamente como uma textura utilizando texElementImage2D.
+## 1. Resumo executivo
 
-```javascript
-// Equivalente ao texImage2D tradicional, mas aceita um elemento DOM
-function updateWebGLTexture() {
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  
-  // Passa o elemento DOM diretamente como fonte da textura
-  gl.texElementImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uiElement);
-  
-  // Projeta a coordenada 3D de volta para o espaço CSS para atualizar o DOM
-  const transform = gl.getElementTransform(uiElement);
-  uiElement.style.transform = transform;
-}```
+HTML-in-Canvas é uma proposta experimental que permite renderizar elementos reais do DOM dentro de um `<canvas>`, mantendo capacidades nativas do navegador que seriam perdidas em uma renderização puramente pixel-based.
 
-###2.3 Renderização em Contexto WebGPU
-Em WebGPU, utiliza-se o método de cópia de imagem externa adaptado para elementos do DOM: copyElementImageToTexture.
+A proposta combina:
 
-```javascript
-function updateWebGPUTexture() {
-  device.queue.copyElementImageToTexture(
-    { element: uiElement },
-    { texture: webgpuTexture },
-    [uiElement.offsetWidth, uiElement.offsetHeight]
-  );
-  
-  // Atualização obrigatória do CSS transform pós-cópia
-  const transform = canvas.getElementTransform(uiElement);
-  uiElement.style.transform = transform;
+1. **DOM real**
+   - layout HTML/CSS;
+   - formulários;
+   - seleção de texto;
+   - acessibilidade;
+   - busca nativa na página;
+   - integração com DevTools e extensões.
+
+2. **Canvas/WebGL/WebGPU**
+   - composição gráfica;
+   - efeitos visuais;
+   - texturas;
+   - cenas 2D/3D;
+   - pipelines gráficos customizados.
+
+A lógica central é:  
+**o DOM continua existindo e participando de layout/hit testing, mas sua aparência visual é copiada para o canvas quando o navegador dispara um evento de paint.**
+
+---
+
+## 2. Status tecnológico
+
+### 2.1 Maturidade
+
+A tecnologia está em estágio experimental.
+
+Assuma:
+
+- API sujeita a mudanças;
+- suporte limitado a Chromium/Chrome Canary/Origin Trial/flags;
+- ausência de suporte universal entre navegadores;
+- necessidade obrigatória de fallback;
+- incompatibilidade possível com frameworks e bibliotecas atuais;
+- risco alto para uso direto em produto final sem camada de abstração.
+
+### 2.2 Decisão recomendada
+
+Use HTML-in-Canvas em:
+
+- protótipos;
+- pesquisa técnica;
+- demos;
+- experiências internas;
+- POCs;
+- features progressivamente aprimoradas com fallback DOM tradicional.
+
+Evite depender exclusivamente da API em:
+
+- fluxos críticos de produto;
+- interfaces sem fallback;
+- features que precisam funcionar em todos os navegadores;
+- entregas onde acessibilidade precisa ser garantida imediatamente em produção.
+
+---
+
+## 3. Vocabulário e nomes corretos
+
+### 3.1 Nomes corretos
+
+Use estes nomes:
+
+```html
+<canvas layoutsubtree>
+```
+
+```js
+ctx.drawElementImage(element, x, y)
+```
+
+```js
+canvas.onpaint = () => {}
+canvas.addEventListener("paint", handler)
+```
+
+```js
+canvas.requestPaint?.()
+```
+
+```js
+gl.texElementImage2D(...)
+```
+
+```js
+device.queue.copyElementImageToTexture(...)
+```
+
+```js
+canvas.captureElementImage(element)
+```
+
+### 3.2 Nomes incorretos ou suspeitos
+
+Não usar:
+
+```html
+<canvas layout subtree>
+```
+
+Motivo: o atributo correto é `layoutsubtree`, sem espaço.
+
+Não assumir que existe:
+
+```js
+transform.toCSS()
+```
+
+Motivo: os exemplos oficiais usam `transform.toString()` ou aplicam diretamente a string retornada/serializada.
+
+Não assumir como estável:
+
+```js
+new THREE.HTMLTexture(element)
+```
+
+Motivo: há demos/integrações experimentais, mas não tratar como API estável do Three.js sem verificação da versão/biblioteca usada.
+
+Não inventar helpers como:
+
+```js
+gl.getElementTransform(element)
+canvas.getElementTransform(element)
+```
+
+Só usar se estiverem confirmados no ambiente ou documentados na versão alvo. A proposta menciona helper de transformação para contextos 3D, mas o agente deve tratar isso como área experimental e validar a assinatura real.
+
+---
+
+## 4. Modelo mental da API
+
+### 4.1 Estrutura
+
+O conteúdo HTML fica dentro do próprio `<canvas>`:
+
+```html
+<canvas id="stage" layoutsubtree>
+  <div id="panel">
+    <label for="name">Nome</label>
+    <input id="name" />
+    <button type="button">Enviar</button>
+  </div>
+</canvas>
+```
+
+O elemento interno:
+
+- participa de layout;
+- participa de hit testing;
+- pode ser acessível;
+- pode receber foco;
+- não aparece automaticamente na tela como DOM comum;
+- precisa ser desenhado explicitamente no canvas.
+
+### 4.2 Renderização
+
+O navegador tira um snapshot interno da renderização dos filhos do canvas.
+
+Durante o evento `paint`, o código chama:
+
+```js
+ctx.drawElementImage(panel, x, y)
+```
+
+Isso desenha o elemento no canvas e retorna uma transformação que deve ser aplicada ao elemento DOM para manter o hit testing, foco e acessibilidade alinhados com os pixels desenhados.
+
+### 4.3 Sincronização
+
+Regra crítica:
+
+> Sempre que um elemento DOM for desenhado em uma posição/escala/transformação dentro do canvas, sua posição DOM invisível/interativa deve ser sincronizada com a posição visual desenhada.
+
+Sem isso, o usuário pode ver o botão em um lugar e o navegador entender que ele está em outro.
+
+---
+
+## 5. Contrato estrutural obrigatório
+
+Qualquer implementação gerada por agente deve respeitar este contrato.
+
+### 5.1 HTML
+
+```html
+<canvas id="stage" layoutsubtree>
+  <div id="ui-root">
+    <!-- UI real e semântica aqui -->
+  </div>
+</canvas>
+```
+
+Regras:
+
+- o atributo deve ser `layoutsubtree`;
+- elementos desenhados devem ser filhos diretos do canvas quando exigido pela API;
+- não usar `display: none` nos elementos que serão desenhados;
+- preferir esconder visualmente via mecanismo da própria API, não via CSS que remova boxes;
+- manter HTML semântico: `button`, `input`, `label`, `form`, `nav`, etc.
+
+### 5.2 CSS
+
+```css
+#stage {
+  width: 800px;
+  height: 600px;
 }
 
-## 3. Integração com Frameworks 3D (Camada de Abstração)
+#ui-root {
+  transform-origin: 0 0;
+}
+```
 
-### 3.1 Three.js
-O Three.js implementou suporte experimental nativo via 3.htmlTexture.
+Regras:
 
-```javascript
-import * as THREE from 'three';
+- definir tamanho CSS do canvas;
+- sincronizar o tamanho interno do canvas com o tamanho físico em device pixels;
+- usar `transform-origin` explícito quando a posição precisa ser precisa;
+- evitar depender de CSS transform no elemento-fonte para o desenho, pois CSS transforms do elemento podem ser ignorados pelo desenho e ainda afetar hit testing.
 
-// Captura o elemento DOM interno ao canvas
-const element = document.getElementById('ui-card');
+### 5.3 JavaScript 2D mínimo
 
-// Cria a textura vinculada ao HTML
-const htmlTexture = new THREE.HTMLTexture(element);
+```js
+const canvas = document.querySelector("#stage");
+const ctx = canvas.getContext("2d");
+const uiRoot = document.querySelector("#ui-root");
 
-// Aplica a textura ao material do objeto 3D
-const material = new THREE.MeshBasicMaterial({ map: htmlTexture });
-const geometry = new THREE.BoxGeometry(2, 2, 2);
-const mesh = new THREE.Mesh(geometry, material);
+function supportsHtmlInCanvas2D() {
+  return Boolean(
+    canvas &&
+    ctx &&
+    "drawElementImage" in CanvasRenderingContext2D.prototype &&
+    "onpaint" in canvas
+  );
+}
 
-scene.add(mesh);
+function syncCanvasResolution() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
 
-### 3.2 PlayCanvas
-O PlayCanvas utiliza listeners de evento para atualizar a propriedade de mapa difuso (diffuseMap).
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
 
-// Criação da textura baseada em elemento HTML
-const htmlElement = document.getElementById('ui-container');
-const texture = new pc.Texture(device);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
-htmlElement.addEventListener('paint', () => {
-    // Sincroniza os pixels do DOM com a GPU
-    texture.uploadElement(htmlElement);
+const resizeObserver = new ResizeObserver(() => {
+  syncCanvasResolution();
+  canvas.requestPaint?.();
 });
 
-const material = new pc.StandardMaterial();
-material.diffuseMap = texture;
-material.update();
+resizeObserver.observe(canvas);
 
-## 4. Diretrizes Críticas para Geração de Código por IA
-Ao instruir o Codex ou agentes autônomos a desenvolver componentes baseados nesta tecnologia, certifique-se de que as seguintes regras sejam estritamente validadas na saída do código:
+canvas.addEventListener("paint", () => {
+  ctx.reset?.();
+  syncCanvasResolution();
 
-1. Estrutura HTML Obrigatória:
-<canvas layout subtree width="800" height="600">
-    <div id="ui-component">
-        <input type="text" placeholder="Digite aqui..." />
-        <button>Enviar</button>
-    </div>
-</canvas>
+  const transform = ctx.drawElementImage(uiRoot, 100, 80);
 
-2. Gerenciamento de Escala (Anti-Blur): Sempre implemente um ResizeObserver no canvas para ajustar os fatores de escala de pixels (window.devicePixelRatio) antes de invocar as rotinas de desenho, evitando artefatos borrados na UI renderizada.
+  uiRoot.style.transformOrigin = "0 0";
+  uiRoot.style.transform = transform.toString();
+});
+```
 
-3. Limpeza de Memória (Garbage Collection): Se um elemento HTML for removido da lógica de renderização do canvas, ele deve ser explicitamente removido da subárvore do elemento <canvas> no DOM. Caso contrário, o motor do navegador continuará expondo o elemento invisível para a árvore de acessibilidade e interceptando eventos fantasmas de mouse/teclado.
+Observação: `ctx.reset()` ainda pode não estar disponível em todos os ambientes. O agente pode usar fallback com `ctx.setTransform(1, 0, 0, 1, 0, 0)` + `clearRect`.
 
-4. Fallback Obrigatório: Como a API está em estágio de Origin Trial (maio de 2026), o código gerado deve conter uma validação de feature detection ('drawElementImage' in CanvasRenderingContext2D.prototype) e um fallback funcional baseado em renderização DOM tradicional sobreposta, caso a API não esteja ativa no navegador cliente.
+---
+
+## 6. Feature detection e fallback
+
+### 6.1 Regra obrigatória
+
+Todo código gerado deve conter fallback.
+
+Nunca gerar uma implementação que dependa exclusivamente de HTML-in-Canvas.
+
+### 6.2 Feature detection mínimo
+
+```js
+function supportsHtmlInCanvas2D(canvas) {
+  const ctx = canvas.getContext("2d");
+
+  return Boolean(
+    ctx &&
+    "drawElementImage" in CanvasRenderingContext2D.prototype &&
+    "onpaint" in canvas
+  );
+}
+```
+
+### 6.3 Estratégias de fallback
+
+#### Opção A — DOM overlay
+
+Mais segura para interfaces interativas.
+
+Renderiza o canvas normalmente e posiciona uma camada HTML sobreposta.
+
+```html
+<div class="stage-shell">
+  <canvas id="stage"></canvas>
+  <div id="fallback-ui">
+    <!-- mesma UI semântica -->
+  </div>
+</div>
+```
+
+```css
+.stage-shell {
+  position: relative;
+}
+
+#stage,
+#fallback-ui {
+  position: absolute;
+  inset: 0;
+}
+
+#fallback-ui {
+  pointer-events: auto;
+}
+```
+
+Use quando:
+
+- existem inputs, botões e formulários;
+- acessibilidade é prioridade;
+- a UI precisa funcionar em qualquer navegador.
+
+#### Opção B — Canvas-only simplificado
+
+Mais frágil. Só usar para conteúdo não interativo ou decorativo.
+
+Use quando:
+
+- labels simples;
+- gráficos estáticos;
+- nenhum input/foco/copy-paste é necessário.
+
+#### Opção C — Desabilitar feature experimental
+
+Use quando a experiência depende fortemente da API.
+
+Exibir aviso claro:
+
+```txt
+Esta visualização experimental requer navegador Chromium com HTML-in-Canvas habilitado.
+```
+
+---
+
+## 7. Resize, escala e anti-blur
+
+### 7.1 Problema
+
+Canvas possui dois tamanhos:
+
+- tamanho CSS;
+- tamanho interno em pixels.
+
+Se o canvas interno não acompanha `devicePixelRatio`, a UI renderizada pode ficar borrada.
+
+### 7.2 Solução recomendada
+
+Preferir `ResizeObserver` com `device-pixel-content-box` quando disponível.
+
+```js
+const observer = new ResizeObserver(([entry]) => {
+  const box = entry.devicePixelContentBoxSize?.[0];
+
+  if (box) {
+    canvas.width = box.inlineSize;
+    canvas.height = box.blockSize;
+  } else {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+  }
+
+  canvas.requestPaint?.();
+});
+
+observer.observe(canvas, { box: "device-pixel-content-box" });
+```
+
+---
+
+## 8. Ciclo de paint
+
+### 8.1 Regra
+
+O evento `paint` deve ser tratado como o ponto principal para redesenhar HTML no canvas.
+
+```js
+canvas.addEventListener("paint", (event) => {
+  for (const element of event.changedElements ?? []) {
+    // opcional: otimizar redraw parcial
+  }
+
+  render();
+});
+```
+
+### 8.2 Quando chamar `requestPaint`
+
+Use `canvas.requestPaint?.()` quando:
+
+- a posição do elemento muda por lógica externa;
+- a câmera 3D muda;
+- uma animação do canvas precisa redesenhar HTML;
+- houve resize;
+- o canvas atualiza todo frame.
+
+### 8.3 Cuidado
+
+Mudanças de DOM feitas dentro do handler de `paint` podem só aparecer no frame seguinte. Não criar loops de mutação sem controle.
+
+---
+
+## 9. Segurança e privacidade
+
+A API possui restrições para evitar vazamento de dados sensíveis via leitura de pixels, timing ou invalidação.
+
+O agente deve evitar depender de pintura de:
+
+- conteúdo cross-origin;
+- imagens externas sem CORS adequado;
+- iframes cross-origin;
+- SVGs com referências externas;
+- canvases contaminados por dados cross-origin;
+- estados de links visitados;
+- marcações de spellcheck/grammar;
+- informações pendentes de autofill;
+- temas/sistema quando tratados como dados sensíveis.
+
+Regra prática:
+
+> Não use HTML-in-Canvas para capturar, exportar ou inspecionar visualmente conteúdo que o JavaScript normal não deveria conseguir observar.
+
+---
+
+## 10. Acessibilidade
+
+HTML-in-Canvas não elimina a responsabilidade de acessibilidade.
+
+Checklist mínimo:
+
+- usar HTML semântico;
+- associar `label` e `input`;
+- preservar ordem lógica de foco;
+- testar navegação por teclado;
+- testar leitor de tela quando possível;
+- aplicar transformação sincronizada após desenho;
+- não deixar elementos invisíveis interceptando eventos fora da área desenhada;
+- remover elementos obsoletos do DOM;
+- não duplicar controles interativos entre canvas e fallback ativo ao mesmo tempo.
+
+---
+
+## 11. Gerenciamento de elementos e memória
+
+### 11.1 Remoção correta
+
+Se um elemento não será mais usado:
+
+```js
+element.remove();
+canvas.requestPaint?.();
+```
+
+Não basta parar de desenhar o elemento.
+
+Motivo: ele pode continuar participando de acessibilidade, foco e hit testing.
+
+### 11.2 Pools
+
+Para muitas UIs dinâmicas:
+
+- reutilizar nós DOM quando possível;
+- remover nós não utilizados;
+- evitar criar/remover centenas de elementos por frame;
+- separar estado de renderização de estado DOM;
+- usar virtualização quando houver listas grandes.
+
+---
+
+## 12. Integração 2D
+
+### 12.1 Caso recomendado
+
+Use 2D quando:
+
+- precisa de labels ricos em gráficos;
+- quer painéis, tooltips ou controles em canvas;
+- precisa de texto internacionalizado;
+- quer inputs reais sobre composição canvas;
+- quer manter acessibilidade.
+
+### 12.2 Skeleton 2D recomendado
+
+```js
+export function mountHtmlInCanvas2D({ canvas, uiRoot, draw }) {
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx || !("drawElementImage" in CanvasRenderingContext2D.prototype)) {
+    return { supported: false };
+  }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function render() {
+    resize();
+
+    if (ctx.reset) {
+      ctx.reset();
+      ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    draw?.(ctx);
+
+    const transform = ctx.drawElementImage(uiRoot, 24, 24);
+    uiRoot.style.transformOrigin = "0 0";
+    uiRoot.style.transform = transform.toString();
+  }
+
+  canvas.addEventListener("paint", render);
+
+  const ro = new ResizeObserver(() => {
+    resize();
+    canvas.requestPaint?.();
+  });
+
+  ro.observe(canvas);
+
+  resize();
+  canvas.requestPaint?.();
+
+  return {
+    supported: true,
+    destroy() {
+      ro.disconnect();
+      canvas.removeEventListener("paint", render);
+    }
+  };
+}
+```
+
+---
+
+## 13. Integração WebGL/WebGPU
+
+### 13.1 WebGL
+
+Conceito:
+
+```js
+gl.texElementImage2D(/* target, level, internalformat, format, type, element */);
+```
+
+Uso:
+
+- renderizar UI HTML como textura;
+- aplicar a textura em plano, cubo, mesh ou superfície 3D;
+- sincronizar posição DOM com a projeção/câmera para manter interação alinhada.
+
+Risco:
+
+- assinatura pode mudar;
+- helper de transformação pode variar;
+- suporte em biblioteca 3D pode ser experimental;
+- câmera/matriz/projeção exigem sincronização rigorosa.
+
+### 13.2 WebGPU
+
+Conceito:
+
+```js
+device.queue.copyElementImageToTexture(source, destination, size);
+```
+
+Uso:
+
+- copiar o elemento/snapshot para uma textura WebGPU;
+- renderizar essa textura no pipeline 3D/2D;
+- sincronizar transformação DOM separadamente.
+
+Risco:
+
+- assinatura e suporte ainda experimentais;
+- necessidade de validar comportamento no runtime alvo;
+- cuidado com snapshots, workers e `ElementImage`.
+
+### 13.3 Regra para agentes
+
+Quando gerar código WebGL/WebGPU:
+
+- preferir wrappers pequenos e isolados;
+- não misturar lógica da aplicação com chamadas experimentais;
+- documentar assinatura assumida;
+- criar fallback;
+- escrever teste manual de alinhamento entre clique e pixels;
+- não afirmar compatibilidade com Three.js/PlayCanvas sem validação da versão.
+
+---
+
+## 14. Integração com frameworks
+
+### 14.1 React
+
+Padrão recomendado:
+
+- renderizar a UI dentro do canvas como DOM real;
+- usar `ref` para canvas e elemento;
+- inicializar HTML-in-Canvas em `useEffect`;
+- limpar listeners/observers no cleanup;
+- manter fallback como branch separado.
+
+Exemplo conceitual:
+
+```jsx
+function HtmlCanvasDemo() {
+  const canvasRef = useRef(null);
+  const uiRef = useRef(null);
+  const [supported, setSupported] = useState(true);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const uiRoot = uiRef.current;
+
+    if (!canvas || !uiRoot) return;
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx || !("drawElementImage" in CanvasRenderingContext2D.prototype)) {
+      setSupported(false);
+      return;
+    }
+
+    function render() {
+      ctx.reset?.();
+      const transform = ctx.drawElementImage(uiRoot, 32, 32);
+      uiRoot.style.transformOrigin = "0 0";
+      uiRoot.style.transform = transform.toString();
+    }
+
+    canvas.addEventListener("paint", render);
+    canvas.requestPaint?.();
+
+    return () => {
+      canvas.removeEventListener("paint", render);
+    };
+  }, []);
+
+  if (!supported) {
+    return <FallbackDomUI />;
+  }
+
+  return (
+    <canvas ref={canvasRef} layoutsubtree="true">
+      <div ref={uiRef}>
+        <button type="button">Ação</button>
+      </div>
+    </canvas>
+  );
+}
+```
+
+Observação: em JSX, atributos booleanos não padronizados podem exigir string ou propagação explícita. Validar o HTML final renderizado.
+
+### 14.2 Three.js
+
+Não assumir API oficial estável.
+
+Estratégia segura:
+
+- criar uma camada `HtmlCanvasTextureAdapter`;
+- validar se a extensão/biblioteca usada oferece suporte;
+- caso contrário, usar DOM overlay ou textura tradicional;
+- isolar chamadas experimentais em um arquivo único.
+
+### 14.3 PlayCanvas
+
+Mesma regra:
+
+- tratar suporte como experimental;
+- validar APIs reais do engine;
+- encapsular upload/cópia de elemento HTML;
+- manter fallback.
+
+---
+
+## 15. Padrão de arquitetura para projeto com agentes
+
+### 15.1 Organização sugerida
+
+```txt
+src/
+  html-in-canvas/
+    support.ts
+    resizeCanvas.ts
+    mount2D.ts
+    fallbackOverlay.ts
+    syncTransform.ts
+    types.ts
+  components/
+    CanvasStage.tsx
+    CanvasFallbackUI.tsx
+  tests/
+    htmlInCanvas.support.test.ts
+    htmlInCanvas.fallback.test.ts
+```
+
+### 15.2 Responsabilidades
+
+`support.ts`
+
+- feature detection;
+- identificação do modo disponível: `native-2d`, `webgl`, `webgpu`, `fallback`.
+
+`resizeCanvas.ts`
+
+- sincronização CSS pixels/device pixels;
+- ResizeObserver;
+- requestPaint após resize.
+
+`mount2D.ts`
+
+- listeners de paint;
+- chamada `drawElementImage`;
+- aplicação do transform;
+- cleanup.
+
+`fallbackOverlay.ts`
+
+- DOM overlay;
+- ativação/desativação sem duplicar foco.
+
+`syncTransform.ts`
+
+- funções utilitárias para aplicar transform;
+- comentários sobre origem, escala e CTM.
+
+---
+
+## 16. Critérios de aceite para agentes
+
+Uma entrega só é aceitável se cumprir todos os pontos abaixo.
+
+### 16.1 API
+
+- [ ] Usa `layoutsubtree`, não `layout subtree`.
+- [ ] Usa `drawElementImage` apenas após suporte detectado.
+- [ ] Usa evento `paint` ou `requestPaint` quando adequado.
+- [ ] Não inventa helpers não confirmados.
+- [ ] Isola chamadas experimentais.
+
+### 16.2 Fallback
+
+- [ ] Existe fallback funcional.
+- [ ] Fallback preserva a interação principal.
+- [ ] Não há dois controles interativos ativos simultaneamente causando foco duplicado.
+- [ ] Mensagem de limitação aparece quando fallback não é possível.
+
+### 16.3 Interação
+
+- [ ] Clique ocorre onde o elemento aparece visualmente.
+- [ ] Foco via teclado funciona.
+- [ ] Inputs aceitam digitação.
+- [ ] Botões disparam eventos.
+- [ ] Seleção de texto funciona quando aplicável.
+
+### 16.4 Acessibilidade
+
+- [ ] HTML semântico.
+- [ ] Labels associados.
+- [ ] Ordem de foco coerente.
+- [ ] Elementos removidos não continuam acessíveis.
+- [ ] Fallback acessível.
+
+### 16.5 Visual
+
+- [ ] Canvas não fica borrado em telas HiDPI.
+- [ ] Resize mantém proporção correta.
+- [ ] UI desenhada e DOM interativo permanecem alinhados.
+- [ ] Não há elementos fantasmas interceptando eventos.
+
+### 16.6 Manutenção
+
+- [ ] Cleanup de listeners.
+- [ ] Cleanup de ResizeObserver.
+- [ ] Remoção de elementos obsoletos.
+- [ ] Comentários indicam o caráter experimental da API.
+- [ ] Código permite troca por fallback sem reescrever a aplicação.
+
+---
+
+## 17. Anti-padrões
+
+Evitar:
+
+```html
+<canvas layout subtree>
+```
+
+Evitar:
+
+```js
+uiElement.style.transform = transform.toCSS();
+```
+
+Evitar:
+
+```js
+document.body.appendChild(uiElement);
+ctx.drawElementImage(uiElement, 0, 0);
+```
+
+Motivo: o elemento precisa estar no contexto correto do canvas, conforme restrições da proposta.
+
+Evitar:
+
+```js
+uiRoot.style.display = "none";
+ctx.drawElementImage(uiRoot, 0, 0);
+```
+
+Motivo: elemento sem boxes gerados não deve ser desenhado.
+
+Evitar:
+
+```js
+if (!supported) {
+  alert("Atualize seu navegador");
+}
+```
+
+Motivo: precisa haver fallback funcional quando possível.
+
+Evitar:
+
+```js
+// Criar 500 inputs novos por frame
+```
+
+Motivo: custo alto de layout, acessibilidade e garbage collection.
+
+---
+
+## 18. Prompt base para Codex/agente
+
+Use este prompt quando pedir implementação:
+
+```txt
+Você está implementando uma POC com HTML-in-Canvas.
+
+Use a base tecnológica deste projeto como fonte de verdade. A API é experimental; portanto:
+
+1. Use o atributo correto `layoutsubtree`.
+2. Faça feature detection antes de chamar `drawElementImage`.
+3. Renderize HTML real dentro do `<canvas>`.
+4. Use o evento `paint` para desenhar o elemento no canvas.
+5. Aplique o transform retornado por `drawElementImage` no elemento DOM para alinhar hit testing/foco/acessibilidade.
+6. Implemente ResizeObserver e ajuste para devicePixelRatio.
+7. Inclua fallback DOM overlay funcional.
+8. Não invente APIs. Se uma assinatura WebGL/WebGPU/Three.js não estiver confirmada, isole em adapter e documente como experimental.
+9. Inclua cleanup de listeners/observers.
+10. Entregue critérios de teste manual para clique, foco, resize, acessibilidade e fallback.
+
+Gere código simples, isolado e verificável.
+```
+
+---
+
+## 19. Prompt de revisão para agente
+
+Use este prompt para pedir auditoria:
+
+```txt
+Revise esta implementação de HTML-in-Canvas.
+
+Procure especificamente:
+
+- uso incorreto de `layoutsubtree`;
+- ausência de feature detection;
+- ausência de fallback;
+- chamadas a APIs inexistentes ou não confirmadas;
+- falta de sincronização do transform;
+- canvas borrado por erro de devicePixelRatio;
+- elementos invisíveis interceptando eventos;
+- listeners/observers sem cleanup;
+- acessibilidade quebrada;
+- duplicação de UI interativa entre fallback e canvas;
+- código que depende de Chrome Canary/Origin Trial sem aviso.
+
+Retorne:
+1. problemas críticos;
+2. problemas médios;
+3. melhorias;
+4. patch sugerido.
+```
+
+---
+
+## 20. Prompt de teste manual
+
+```txt
+Crie um checklist de teste manual para esta POC HTML-in-Canvas cobrindo:
+
+- navegador com suporte;
+- navegador sem suporte;
+- clique;
+- foco por teclado;
+- digitação em input;
+- seleção de texto;
+- Ctrl/Cmd+F;
+- zoom do navegador;
+- resize da janela;
+- tela HiDPI;
+- leitor de tela;
+- remoção dinâmica de elementos;
+- fallback DOM overlay.
+```
+
+---
+
+## 21. Exemplo de fallback completo simplificado
+
+```html
+<div class="stage-shell" data-mode="auto">
+  <canvas id="stage" layoutsubtree>
+    <form id="native-ui">
+      <label for="email">Email</label>
+      <input id="email" type="email" />
+      <button type="submit">Enviar</button>
+    </form>
+  </canvas>
+
+  <form id="fallback-ui" hidden>
+    <label for="fallback-email">Email</label>
+    <input id="fallback-email" type="email" />
+    <button type="submit">Enviar</button>
+  </form>
+</div>
+```
+
+```js
+const canvas = document.querySelector("#stage");
+const nativeUi = document.querySelector("#native-ui");
+const fallbackUi = document.querySelector("#fallback-ui");
+const ctx = canvas.getContext("2d");
+
+const supported =
+  ctx &&
+  "drawElementImage" in CanvasRenderingContext2D.prototype &&
+  "onpaint" in canvas;
+
+if (!supported) {
+  fallbackUi.hidden = false;
+  canvas.hidden = true;
+} else {
+  fallbackUi.hidden = true;
+  canvas.hidden = false;
+
+  canvas.addEventListener("paint", () => {
+    ctx.reset?.();
+    const transform = ctx.drawElementImage(nativeUi, 40, 40);
+    nativeUi.style.transformOrigin = "0 0";
+    nativeUi.style.transform = transform.toString();
+  });
+
+  canvas.requestPaint?.();
+}
+```
+
+---
+
+## 22. Fontes técnicas para validação
+
+Consultar antes de consolidar qualquer implementação de produção:
+
+- Chrome Developers — Introducing the HTML-in-Canvas API origin trial  
+  https://developer.chrome.com/blog/html-in-canvas-origin-trial
+
+- WICG — HTML-in-Canvas explainer  
+  https://github.com/WICG/html-in-canvas
+
+- Chrome Platform Status — HTML-in-canvas  
+  https://chromestatus.com/feature/5172548013916160
+
+- Blink Dev — Intent/Developer Trial threads  
+  https://groups.google.com/a/chromium.org/g/blink-dev
+
+---
+
+## 23. Notas de correção em relação à documentação anterior
+
+Correções aplicadas nesta versão:
+
+- corrigido `layout subtree` para `layoutsubtree`;
+- removida confiança excessiva em `transform.toCSS()`;
+- reduzida a afirmação de suporte nativo estável em Three.js/PlayCanvas;
+- reforçado fallback obrigatório;
+- reforçado status experimental;
+- adicionados prompts de implementação, revisão e teste;
+- adicionados critérios de aceite;
+- adicionada arquitetura sugerida para agentes;
+- adicionados alertas de privacidade, acessibilidade e garbage collection;
+- separadas APIs confirmadas da proposta de helpers/integrações ainda experimentais.
