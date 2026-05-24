@@ -98,7 +98,7 @@ A lógica central é:
 
 ## 3. Status tecnológico
 
-### 2.1 Maturidade
+### 3.1 Maturidade
 
 A tecnologia está em estágio experimental.
 
@@ -111,7 +111,7 @@ Assuma:
 - incompatibilidade possível com frameworks e bibliotecas atuais;
 - risco alto para uso direto em produto final sem camada de abstração.
 
-### 2.2 Decisão recomendada
+### 3.2 Decisão recomendada
 
 Use HTML-in-Canvas em:
 
@@ -133,7 +133,7 @@ Evite depender exclusivamente da API em:
 
 ## 4. Vocabulário e nomes corretos
 
-### 3.1 Nomes corretos
+### 4.1 Nomes corretos
 
 Use estes nomes:
 
@@ -166,7 +166,7 @@ device.queue.copyElementImageToTexture(...)
 canvas.captureElementImage(element)
 ```
 
-### 3.2 Nomes incorretos ou suspeitos
+### 4.2 Nomes incorretos ou suspeitos
 
 Não usar:
 
@@ -205,7 +205,7 @@ Só usar se estiverem confirmados no ambiente ou documentados na versão alvo. A
 
 ## 5. Modelo mental da API
 
-### 4.1 Estrutura
+### 5.1 Estrutura
 
 O conteúdo HTML fica dentro do próprio `<canvas>`:
 
@@ -228,7 +228,7 @@ O elemento interno:
 - não aparece automaticamente na tela como DOM comum;
 - precisa ser desenhado explicitamente no canvas.
 
-### 4.2 Renderização
+### 5.2 Renderização
 
 O navegador tira um snapshot interno da renderização dos filhos do canvas.
 
@@ -240,7 +240,7 @@ ctx.drawElementImage(panel, x, y)
 
 Isso desenha o elemento no canvas e retorna uma transformação que deve ser aplicada ao elemento DOM para manter o hit testing, foco e acessibilidade alinhados com os pixels desenhados.
 
-### 4.3 Sincronização
+### 5.3 Sincronização
 
 Regra crítica:
 
@@ -254,7 +254,7 @@ Sem isso, o usuário pode ver o botão em um lugar e o navegador entender que el
 
 Qualquer implementação gerada por agente deve respeitar este contrato.
 
-### 5.1 HTML
+### 6.1 HTML
 
 ```html
 <canvas id="stage" layoutsubtree>
@@ -272,7 +272,7 @@ Regras:
 - preferir esconder visualmente via mecanismo da própria API, não via CSS que remova boxes;
 - manter HTML semântico: `button`, `input`, `label`, `form`, `nav`, etc.
 
-### 5.2 CSS
+### 6.2 CSS
 
 ```css
 #stage {
@@ -292,7 +292,7 @@ Regras:
 - usar `transform-origin` explícito quando a posição precisa ser precisa;
 - evitar depender de CSS transform no elemento-fonte para o desenho, pois CSS transforms do elemento podem ser ignorados pelo desenho e ainda afetar hit testing.
 
-### 5.3 JavaScript 2D mínimo
+### 6.3 JavaScript 2D mínimo
 
 ```js
 const canvas = document.querySelector("#stage");
@@ -342,13 +342,13 @@ Observação: `ctx.reset()` ainda pode não estar disponível em todos os ambien
 
 ## 7. Feature detection e fallback
 
-### 6.1 Regra obrigatória
+### 7.1 Regra obrigatória
 
 Todo código gerado deve conter fallback.
 
 Nunca gerar uma implementação que dependa exclusivamente de HTML-in-Canvas.
 
-### 6.2 Feature detection mínimo
+### 7.2 Feature detection mínimo
 
 ```js
 function supportsHtmlInCanvas2D(canvas) {
@@ -362,7 +362,7 @@ function supportsHtmlInCanvas2D(canvas) {
 }
 ```
 
-### 6.3 Estratégias de fallback
+### 7.3 Estratégias de fallback
 
 #### Opção A — DOM overlay
 
@@ -425,7 +425,7 @@ Esta visualização experimental requer navegador Chromium com HTML-in-Canvas ha
 
 ## 8. Resize, escala e anti-blur
 
-### 7.1 Problema
+### 8.1 Problema
 
 Canvas possui dois tamanhos:
 
@@ -434,7 +434,7 @@ Canvas possui dois tamanhos:
 
 Se o canvas interno não acompanha `devicePixelRatio`, a UI renderizada pode ficar borrada.
 
-### 7.2 Solução recomendada
+### 8.2 Solução recomendada
 
 Preferir `ResizeObserver` com `device-pixel-content-box` quando disponível.
 
@@ -463,7 +463,7 @@ observer.observe(canvas, { box: "device-pixel-content-box" });
 
 ## 9. Ciclo de paint
 
-### 8.1 Regra
+### 9.1 Regra
 
 O evento `paint` deve ser tratado como o ponto principal para redesenhar HTML no canvas.
 
@@ -477,7 +477,7 @@ canvas.addEventListener("paint", (event) => {
 });
 ```
 
-### 8.2 Quando chamar `requestPaint`
+### 9.2 Quando chamar `requestPaint`
 
 Use `canvas.requestPaint?.()` quando:
 
@@ -487,7 +487,7 @@ Use `canvas.requestPaint?.()` quando:
 - houve resize;
 - o canvas atualiza todo frame.
 
-### 8.3 Cuidado
+### 9.3 Cuidado
 
 Mudanças de DOM feitas dentro do handler de `paint` podem só aparecer no frame seguinte. Não criar loops de mutação sem controle.
 
@@ -535,7 +535,7 @@ Checklist mínimo:
 
 ## 12. Gerenciamento de elementos e memória
 
-### 11.1 Remoção correta
+### 12.1 Remoção correta
 
 Se um elemento não será mais usado:
 
@@ -548,7 +548,7 @@ Não basta parar de desenhar o elemento.
 
 Motivo: ele pode continuar participando de acessibilidade, foco e hit testing.
 
-### 11.2 Pools
+### 12.2 Pools
 
 Para muitas UIs dinâmicas:
 
@@ -562,7 +562,7 @@ Para muitas UIs dinâmicas:
 
 ## 13. Integração 2D
 
-### 12.1 Caso recomendado
+### 13.1 Caso recomendado
 
 Use 2D quando:
 
@@ -572,7 +572,7 @@ Use 2D quando:
 - quer inputs reais sobre composição canvas;
 - quer manter acessibilidade.
 
-### 12.2 Skeleton 2D recomendado
+### 13.2 Skeleton 2D recomendado
 
 ```js
 export function mountHtmlInCanvas2D({ canvas, uiRoot, draw }) {
@@ -635,7 +635,7 @@ export function mountHtmlInCanvas2D({ canvas, uiRoot, draw }) {
 
 ## 14. Integração WebGL/WebGPU
 
-### 13.1 WebGL
+### 14.1 WebGL
 
 Conceito:
 
@@ -656,7 +656,7 @@ Risco:
 - suporte em biblioteca 3D pode ser experimental;
 - câmera/matriz/projeção exigem sincronização rigorosa.
 
-### 13.2 WebGPU
+### 14.2 WebGPU
 
 Conceito:
 
@@ -676,7 +676,7 @@ Risco:
 - necessidade de validar comportamento no runtime alvo;
 - cuidado com snapshots, workers e `ElementImage`.
 
-### 13.3 Regra para agentes
+### 14.3 Regra para agentes
 
 Quando gerar código WebGL/WebGPU:
 
@@ -691,7 +691,7 @@ Quando gerar código WebGL/WebGPU:
 
 ## 15. Integração com frameworks
 
-### 14.1 React
+### 15.1 React
 
 Padrão recomendado:
 
@@ -762,7 +762,7 @@ function HtmlCanvasDemo() {
 
 Observação: em JSX, atributos booleanos não padronizados podem exigir string ou propagação explícita. Validar o HTML final renderizado.
 
-### 14.2 Three.js
+### 15.2 Three.js
 
 Não assumir API oficial estável.
 
@@ -773,7 +773,7 @@ Estratégia segura:
 - caso contrário, usar DOM overlay ou textura tradicional;
 - isolar chamadas experimentais em um arquivo único.
 
-### 14.3 PlayCanvas
+### 15.3 PlayCanvas
 
 Mesma regra:
 
@@ -786,7 +786,7 @@ Mesma regra:
 
 ## 16. Padrão de arquitetura para projeto com agentes
 
-### 15.1 Organização sugerida
+### 16.1 Organização sugerida
 
 ```txt
 src/
@@ -805,7 +805,7 @@ src/
     htmlInCanvas.fallback.test.ts
 ```
 
-### 15.2 Responsabilidades
+### 16.2 Responsabilidades
 
 `support.ts`
 
@@ -854,11 +854,10 @@ Falhas que invalidam a entrega:
 | `devicePixelRatio` ignorado | alta | adicionar `ResizeObserver` e escala correta |
 | duplicação de elementos focáveis no fallback | alta | garantir um único modo interativo ativo |
 | loop React causado por `paint -> setState -> requestPaint` | alta | mover estado de renderização para refs/adapters |
- para agentes
 
 Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 
-### 16.1 API
+### 17.1 API
 
 - [ ] Usa `layoutsubtree`, não `layout subtree`.
 - [ ] Usa `drawElementImage` apenas após suporte detectado.
@@ -866,14 +865,14 @@ Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 - [ ] Não inventa helpers não confirmados.
 - [ ] Isola chamadas experimentais.
 
-### 16.2 Fallback
+### 17.2 Fallback
 
 - [ ] Existe fallback funcional.
 - [ ] Fallback preserva a interação principal.
 - [ ] Não há dois controles interativos ativos simultaneamente causando foco duplicado.
 - [ ] Mensagem de limitação aparece quando fallback não é possível.
 
-### 16.3 Interação
+### 17.3 Interação
 
 - [ ] Clique ocorre onde o elemento aparece visualmente.
 - [ ] Foco via teclado funciona.
@@ -881,7 +880,7 @@ Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 - [ ] Botões disparam eventos.
 - [ ] Seleção de texto funciona quando aplicável.
 
-### 16.4 Acessibilidade
+### 17.4 Acessibilidade
 
 - [ ] HTML semântico.
 - [ ] Labels associados.
@@ -889,14 +888,14 @@ Uma entrega só é aceitável se cumprir todos os pontos abaixo.
 - [ ] Elementos removidos não continuam acessíveis.
 - [ ] Fallback acessível.
 
-### 16.5 Visual
+### 17.5 Visual
 
 - [ ] Canvas não fica borrado em telas HiDPI.
 - [ ] Resize mantém proporção correta.
 - [ ] UI desenhada e DOM interativo permanecem alinhados.
 - [ ] Não há elementos fantasmas interceptando eventos.
 
-### 16.6 Manutenção
+### 17.6 Manutenção
 
 - [ ] Cleanup de listeners.
 - [ ] Cleanup de ResizeObserver.
@@ -1101,4 +1100,3 @@ Consultar antes de consolidar qualquer implementação de produção:
 
 - Blink Dev — Intent/Developer Trial threads  
   https://groups.google.com/a/chromium.org/g/blink-dev
-
